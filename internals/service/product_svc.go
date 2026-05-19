@@ -153,7 +153,7 @@ LockAcquire:
 	return nil
 }
 
-func (h *ProductService) RedisAtomicOrder(c *gin.Context, req controller.OrderRequest) error {
+func (h *ProductService) RedisAtomicOrder(c *gin.Context, req dto.OrderRequest) error {
 	ctx := c.Request.Context()
 
 	stockKey := "stock:product:" + strconv.Itoa(req.ProductID)
