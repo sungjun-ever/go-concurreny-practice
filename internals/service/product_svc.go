@@ -8,7 +8,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -23,7 +22,7 @@ func NewOrderHandler(productRepo *repository.ProductRepo, redisRepo *repository.
 
 // NativeOrder - 동시성 제어가 없는 로직
 // 동시에 요청이 들어오는 경우 재고가 정확히 관리되지 않음
-func (h *ProductService) NativeOrder(c *gin.Context, req dto.OrderRequest) error {
+func (h *ProductService) NativeOrder(c context.Context, req dto.OrderRequest) error {
 	currentStock, err := h.ProductRepo.GetStock(req.ProductID)
 	if err != nil {
 		return errors.New("DB error")
@@ -44,7 +43,7 @@ func (h *ProductService) NativeOrder(c *gin.Context, req dto.OrderRequest) error
 
 // PessimisticOrder - 정합성은 유지된다. 하지만 커밋되기전까지 다른 요청들은 락을 획득하기 위해 대기하거나, 획득에 실패하면 에러 발생
 // 요청이 밀린다면 커넥션 풀이 고갈되고, 요청들이 쌓여 다른 디비 요청들도 연쇄 장애 발생할 수 있음
-func (h *ProductService) PessimisticOrder(c *gin.Context, req dto.OrderRequest) error {
+func (h *ProductService) PessimisticOrder(ctx context.Context, req dto.OrderRequest) error {
 	tx, err := h.ProductRepo.DB.Begin()
 	if err != nil {
 		return errors.New("트랜잭션 사용 실패")
@@ -55,7 +54,6 @@ func (h *ProductService) PessimisticOrder(c *gin.Context, req dto.OrderRequest) 
 
 	// 락 획득 재시도 로직
 	// 최대 3초 대기
-	ctx := c.Request.Context()
 	waitCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
@@ -98,8 +96,7 @@ LockAcquired:
 
 // RedisLockOrder - DB 트랜잭션 대기열은 없음, 동시에 여러 요청이 들어와도 1개만 락을 얻어 DB로 들어가고 나머지는 락 해제를 대기하며 기다림
 // 재시도 로직(스핀 락)으로 인해 redis에 부하를 준다, 결국 락을 쥐고 있는 하나의 요청이 SELECT와 UPDATE 쿼리를 사용해야함
-func (h *ProductService) RedisLockOrder(c *gin.Context, req dto.OrderRequest) error {
-	ctx := c.Request.Context()
+func (h *ProductService) RedisLockOrder(ctx context.Context, req dto.OrderRequest) error {
 	lockKey := rediskey.LoadProductLockKey(req.ProductID)
 
 	// 락 소유를 확인하기위한 값 생성
@@ -153,8 +150,7 @@ LockAcquire:
 	return nil
 }
 
-func (h *ProductService) RedisAtomicOrder(c *gin.Context, req dto.OrderRequest) error {
-	ctx := c.Request.Context()
+func (h *ProductService) RedisAtomicOrder(ctx context.Context, req dto.OrderRequest) error {
 	remainingStock, err := h.RedisRepo.DecreaseStockAtomicWithLoad(ctx, req.ProductID, req.Quantity, h.ProductRepo)
 	if err != nil {
 		// 재고 소진(Business Error)이거나 레디스 장애(System Error) 처리

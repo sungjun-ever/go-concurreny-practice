@@ -16,13 +16,14 @@ func NewProductController(ps *service.ProductService) *ProductController {
 }
 
 func (pc *ProductController) BuyProduct(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.OrderRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "입력값 오류"})
 	}
 
-	err := pc.ps.NativeOrder(c, req)
+	err := pc.ps.NativeOrder(ctx, req)
 
 	// 에러 처리는 생략
 	if err != nil {
