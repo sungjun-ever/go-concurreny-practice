@@ -1,15 +1,11 @@
 package controller
 
 import (
+	"concurreny_test/internals/dto"
 	"concurreny_test/internals/service"
 
 	"github.com/gin-gonic/gin"
 )
-
-type OrderRequest struct {
-	ProductID int `json:"product_id"`
-	Quantity  int `json:"quantity"`
-}
 
 type ProductController struct {
 	ps *service.ProductService
@@ -20,7 +16,7 @@ func NewProductController(ps *service.ProductService) *ProductController {
 }
 
 func (pc *ProductController) BuyProduct(c *gin.Context) {
-	var req OrderRequest
+	var req dto.OrderRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "입력값 오류"})
