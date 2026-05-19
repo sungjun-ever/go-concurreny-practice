@@ -1,7 +1,7 @@
 package service
 
 import (
-	"concurreny_test/internals/controller"
+	"concurreny_test/internals/dto"
 	"concurreny_test/internals/repository"
 	"context"
 	"errors"
@@ -23,7 +23,7 @@ func NewOrderHandler(productRepo *repository.ProductRepo, redisRepo *repository.
 
 // NativeOrder - 동시성 제어가 없는 로직
 // 동시에 요청이 들어오는 경우 재고가 정확히 관리되지 않음
-func (h *ProductService) NativeOrder(c *gin.Context, req controller.OrderRequest) error {
+func (h *ProductService) NativeOrder(c *gin.Context, req dto.OrderRequest) error {
 	currentStock, err := h.ProductRepo.GetStock(req.ProductID)
 	if err != nil {
 		return errors.New("DB error")
@@ -44,7 +44,7 @@ func (h *ProductService) NativeOrder(c *gin.Context, req controller.OrderRequest
 
 // PessimisticOrder - 정합성은 유지된다. 하지만 커밋되기전까지 다른 요청들은 락을 획득하기 위해 대기하거나, 획득에 실패하면 에러 발생
 // 요청이 밀린다면 커넥션 풀이 고갈되고, 요청들이 쌓여 다른 디비 요청들도 연쇄 장애 발생할 수 있음
-func (h *ProductService) PessimisticOrder(c *gin.Context, req controller.OrderRequest) error {
+func (h *ProductService) PessimisticOrder(c *gin.Context, req dto.OrderRequest) error {
 	tx, err := h.ProductRepo.DB.Begin()
 	if err != nil {
 		return errors.New("트랜잭션 사용 실패")
@@ -98,7 +98,7 @@ LockAcquired:
 
 // RedisLockOrder - DB 트랜잭션 대기열은 없음, 동시에 여러 요청이 들어와도 1개만 락을 얻어 DB로 들어가고 나머지는 락 해제를 대기하며 기다림
 // 재시도 로직(스핀 락)으로 인해 redis에 부하를 준다, 결국 락을 쥐고 있는 하나의 요청이 SELECT와 UPDATE 쿼리를 사용해야함
-func (h *ProductService) RedisLockOrder(c *gin.Context, req controller.OrderRequest) error {
+func (h *ProductService) RedisLockOrder(c *gin.Context, req dto.OrderRequest) error {
 	ctx := c.Request.Context()
 
 	lockKey := "lock:product:" + strconv.Itoa(req.ProductID)
