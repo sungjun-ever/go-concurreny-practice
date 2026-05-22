@@ -8,10 +8,10 @@ import (
 )
 
 type ProductController struct {
-	ps *service.ProductService
+	ps *service.OrderService
 }
 
-func NewProductController(ps *service.ProductService) *ProductController {
+func NewProductController(ps *service.OrderService) *ProductController {
 	return &ProductController{ps: ps}
 }
 
@@ -23,12 +23,12 @@ func (pc *ProductController) BuyProduct(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "입력값 오류"})
 	}
 
-	err := pc.ps.NativeOrder(ctx, req)
+	stock, err := pc.ps.DecreaseStock(ctx, req)
 
 	// 에러 처리는 생략
 	if err != nil {
 		c.JSON(500, gin.H{"error": "에러 발생"})
 	}
 
-	c.JSON(200, gin.H{"message": "성공"})
+	c.JSON(200, gin.H{"message": "성공", "stock": stock})
 }
